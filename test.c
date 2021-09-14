@@ -17,20 +17,25 @@ void* worker(void* arg) {
     context_t* ctx = arg;
     unsigned rng = ctx->seed;
 
+    int mine = 0;
+    int last = 0;
     for (int i = 0; i < ITERATIONS; ++i) {
         long action = my_rand(&rng);
         if (action & 1) {
-            atomic_fetch_add_explicit(&expected_counter_atomic, 1, memory_order_seq_cst);
+            ++mine;
+            if (mine > last) last = mine;
             counter_inc(ctx->counter, &rng);
         } else {
-            int expected = atomic_load_explicit(&expected_counter_atomic, memory_order_seq_cst);
             int cur = counter_get(ctx->counter);
-            if (cur != expected) {
-                printf("FAIL, expected counter = %d, got %d\n", expected, cur);
+            if (cur < last) {
+                printf("FAIL, expected counter >= %d, got %d\n", last, cur);
                 abort();
             }
+            last = cur;
         }
     }
+
+    expected_counter_atomic += mine;
 
     return NULL;
 }
